@@ -1,15 +1,18 @@
 package android.saswat.dashcamapplication
 
+import ai.onnxruntime.OnnxTensor
+import ai.onnxruntime.OrtEnvironment
+import ai.onnxruntime.OrtSession
 import android.app.Application
 import android.content.Context
 import android.util.Log
+import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import ai.onnxruntime.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -19,8 +22,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.nio.FloatBuffer
 import java.text.SimpleDateFormat
-import java.util.Locale
 import java.util.ArrayDeque
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.sign
 
@@ -45,11 +48,13 @@ private const val CAMERA_RESOLUTION_WIDTH = 320
 private const val CAMERA_RESOLUTION_HEIGHT = 320
 // Auto sign out constants
 private const val AUTO_SIGNOUT_DELAY_MS = 30 * 60 * 1000L // 30 minutes
+private const val RISK_STORAGE_INTERVAL_MS = 10 * 60 * 1000L // 10 minutes
 
 data class AuthState(
     val isAuthenticated: Boolean = false,
     val error: String? = null,
-    val userId: String? = null
+    val userId: String? = null,
+    val isLoading: Boolean = false
 )
 
 data class ModelState(
@@ -81,30 +86,57 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     private var autoSignoutJob: Job? = null
     private val _isSignedOut = MutableStateFlow(false)
     val isSignedOut: StateFlow<Boolean> = _isSignedOut
+    private var lastRiskStorageTime = 0L
 
     init {
         loadOnnxModel()
         checkCurrentUser()
+        lastRiskStorageTime = System.currentTimeMillis()  // Initialize the last storage time
     }
     
     private fun checkCurrentUser() {
-        auth.currentUser?.let { user ->
-            _authState.value = AuthState(isAuthenticated = true, userId = user.uid)
+        // Instead, always start as logged out
+        _authState.value = AuthState(isAuthenticated = false)
+        
+        // Or if you want to be explicit about signing out any cached user:
+        if (auth.currentUser != null) {
+            signOut()
         }
     }
     
     fun signInWithEmail(email: String, password: String) {
+        // Set loading state to true when starting sign-in
+        _authState.value = _authState.value.copy(
+            isLoading = true, 
+            error = null  // Clear any previous errors
+        )
+        
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val result = auth.signInWithEmailAndPassword(email, password).await()
                 result.user?.let { user ->
-                    _authState.value = AuthState(isAuthenticated = true, userId = user.uid)
+                    _authState.value = AuthState(
+                        isAuthenticated = true, 
+                        userId = user.uid,
+                        isLoading = false  // Reset loading state on success
+                    )
                     _isSignedOut.value = false  // Reset sign out flag
                     startAutoSignoutTimer()  // Start auto sign-out timer
+                } ?: run {
+                    // Handle case where result.user is null but no exception was thrown
+                    _authState.value = AuthState(
+                        isAuthenticated = false,
+                        error = "Sign in failed. Please try again.",
+                        isLoading = false  // Reset loading state
+                    )
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to sign in with email/password", e)
-                _authState.value = AuthState(error = e.message)
+                _authState.value = AuthState(
+                    isAuthenticated = false,
+                    error = e.message ?: "Authentication failed",
+                    isLoading = false  // Reset loading state on error
+                )
             }
         }
     }
@@ -170,7 +202,18 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         val rawRisk = calculateRisk()
         val smoothedRisk = smoothRiskScore(rawRisk)
         _riskScore.value = smoothedRisk
-        storeRiskInFirestore(smoothedRisk)
+        
+        // Only store risk at specified intervals
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastRiskStorageTime >= RISK_STORAGE_INTERVAL_MS) {
+            Log.d(TAG, "INTERVAL CHECK: Time to store risk score (interval reached)")
+            storeRiskInFirestore(smoothedRisk)
+            lastRiskStorageTime = currentTime
+        } else {
+            val timeUntilNextStorage = RISK_STORAGE_INTERVAL_MS - (currentTime - lastRiskStorageTime)
+            Log.d(TAG, "INTERVAL CHECK: Not storing risk yet. Next storage in ${timeUntilNextStorage/1000} seconds")
+        }
+        
         resetAutoSignoutTimer()
     }
     
@@ -313,6 +356,53 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     }
     
     private fun storeRiskInFirestore(risk: Float) {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            Log.e(TAG, "Cannot store risk: User not authenticated")
+            return
+        }
+        
+        val data = hashMapOf(
+            "uid" to uid,
+            "timestamp" to System.currentTimeMillis(),
+            "risk" to risk
+        )
+        
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "STORING RISK: Attempting to store risk score ($risk) for user $uid")
+                
+                // Create a consistent document path for debugging
+                val documentId = "risk_${System.currentTimeMillis()}"
+                
+                db.collection("risk_scores")
+                    .document(uid)
+                    .collection("transactions")
+                    .document(documentId)  
+                    .set(data)
+                    
+                Log.d(TAG, "STORING RISK: Successfully stored risk score in document: risk_scores/$uid/transactions/$documentId")
+            } catch (e: Exception) {
+                Log.e(TAG, "STORING RISK: Error storing risk score", e)
+                
+                // Check for network connectivity issues
+                if (e.message?.contains("host", ignoreCase = true) == true || 
+                    e.message?.contains("network", ignoreCase = true) == true ||
+                    e.message?.contains("connect", ignoreCase = true) == true) {
+                    Log.w(TAG, "STORING RISK: This appears to be a network connectivity issue. " +
+                          "Check that your emulator/device has internet access.")
+                }
+                
+                // Check for permission issues
+                if (e.message?.contains("permission", ignoreCase = true) == true) {
+                    Log.w(TAG, "STORING RISK: This appears to be a permissions issue. " +
+                         "Verify your Firestore rules allow writing to this collection.")
+                }
+            }
+        }
+    }
+    
+    private fun storeRiskInFirestore(risk: Float, retryCount: Int = 0) {
         val uid = auth.currentUser?.uid ?: return
         val data = hashMapOf(
             "uid" to uid,
@@ -322,24 +412,42 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                Log.d(TAG, "Attempting to store risk score ($risk) for user $uid")
                 db.collection("risk_scores")
                     .document(uid)
                     .collection("transactions")
                     .add(data)
                     .await()
-                Log.d(TAG, "Risk score stored successfully")
+                
+                Log.d(TAG, "Successfully stored risk score")
             } catch (e: Exception) {
                 Log.e(TAG, "Error storing risk score", e)
                 
-                // Check for network connectivity issues
-                if (e.message?.contains("host", ignoreCase = true) == true || 
-                    e.message?.contains("network", ignoreCase = true) == true ||
-                    e.message?.contains("connect", ignoreCase = true) == true) {
-                    Log.w(TAG, "This appears to be a network connectivity issue. " +
-                          "Check that your emulator/device has internet access.")
+                // Implement retry logic with backoff
+                if (retryCount < 3) {
+                    delay(1000L * (retryCount + 1))  // Exponential backoff
+                    storeRiskInFirestore(risk, retryCount + 1)
+                    Log.d(TAG, "Retrying risk score storage (attempt ${retryCount + 1})")
+                } else {
+                    // Cache locally when retries fail
+                    saveRiskScoreLocally(risk)
                 }
             }
+        }
+    }
+    
+    private fun saveRiskScoreLocally(risk: Float) {
+        try {
+            val sharedPrefs = getApplication<Application>().getSharedPreferences(
+                "cached_risk_scores", Context.MODE_PRIVATE)
+            
+            val cachedScores = sharedPrefs.getString("pending_scores", "")
+            val newEntry = "${System.currentTimeMillis()}:$risk"
+            val updatedScores = if (cachedScores.isNullOrEmpty()) newEntry else "$cachedScores,$newEntry"
+            
+            sharedPrefs.edit().putString("pending_scores", updatedScores).apply()
+            Log.d(TAG, "Saved risk score locally for later upload")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to cache risk score locally", e)
         }
     }
     
@@ -354,10 +462,27 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     fun signOut() {
         viewModelScope.launch {
             try {
+                // Store final risk score before signing out
+                if (auth.currentUser != null && System.currentTimeMillis() - lastRiskStorageTime > 60000) {
+                    // Only store if it's been at least a minute since last storage
+                    storeRiskInFirestore(_riskScore.value)
+                    Log.d(TAG, "Stored final risk score before sign out")
+                }
+                
+                // Then proceed with sign out
                 auth.signOut()
+                // Rest of sign out code...
+                
+                // Clear any cached auth data from shared preferences or similar stores
+                // (This should help prevent auto sign-in)
+                getApplication<Application>().getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                    .edit {
+                        clear()
+                    }
+                    
                 _authState.value = AuthState(isAuthenticated = false)
                 _isSignedOut.value = true
-                Log.d(TAG, "User signed out due to inactivity")
+                Log.d(TAG, "User signed out successfully")
             } catch (e: Exception) {
                 Log.e(TAG, "Error signing out", e)
             }
@@ -365,17 +490,12 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun onAppBackground() {
-        autoSignoutJob?.cancel()
-        autoSignoutJob = viewModelScope.launch {
-            delay(5 * 60 * 1000L) // 5 minutes when in background
-            signOut()
-        }
-        Log.d(TAG, "App went to background, reduced auto-signout timer")
+        signOut()
+        Log.d(TAG, "App went to background, signing out immediately")
     }
 
     fun onAppForeground() {
-        resetAutoSignoutTimer()
-        Log.d(TAG, "App came to foreground, reset auto-signout timer")
+        Log.d(TAG, "App came to foreground")
     }
 
     private fun startAutoSignoutTimer() {
@@ -386,6 +506,16 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     override fun onCleared() {
         super.onCleared()
         sensorySession?.close()
+        // Clear any active coroutines
+        autoSignoutJob?.cancel()
+        
+        // Store final risk if needed
+        if (auth.currentUser != null) {
+            viewModelScope.launch(Dispatchers.IO) {
+                storeRiskInFirestore(_riskScore.value)
+                Log.d(TAG, "Stored final risk score during ViewModel cleanup")
+            }
+        }
     }
 
     class Factory(private val application: Application) : ViewModelProvider.Factory {
