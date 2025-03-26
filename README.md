@@ -1,2 +1,2 @@
-# Claim-Sense
+# Claim Sense
 Motor Insurance app
