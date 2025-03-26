@@ -1,8 +1,8 @@
 package android.saswat.claimsense.navigation
 
-import android.saswat.claimsense.ui.Screens
+import android.saswat.claimsense.ui.screens.Screens
 import android.saswat.claimsense.ui.dashboard.DashboardScreen
-import android.saswat.claimsense.ui.main.MainScreen
+import android.saswat.claimsense.ui.Main.MainScreen
 import android.saswat.claimsense.ui.signInSignUp.SignInScreen
 import android.saswat.claimsense.ui.signInSignUp.SignUpScreen
 import android.saswat.claimsense.ui.vehicles.VehiclesScreen

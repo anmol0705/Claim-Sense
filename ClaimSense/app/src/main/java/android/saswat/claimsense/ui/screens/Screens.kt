@@ -1,4 +1,4 @@
-package android.saswat.claimsense.ui
+package android.saswat.claimsense.ui.screens
 
 sealed class Screens(val route: String) {
     object Login : Screens("login")
@@ -8,4 +8,5 @@ sealed class Screens(val route: String) {
     object Vehicles : Screens("vehicles")
     object Claims : Screens("claims")
     object Profile : Screens("profile")
+    object RiskScore : Screens("risk_score")
 }

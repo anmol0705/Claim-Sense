@@ -3,8 +3,9 @@ package android.saswat.claimsense.ui.signInSignUp
 import android.content.Context
 import android.net.Uri
 import android.saswat.claimsense.R
-
+import android.saswat.claimsense.ui.components.ProfileImagePicker
 import android.saswat.claimsense.viewmodel.AuthViewModel
+import android.saswat.claimsense.viewmodel.ImageLoadState
 import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
@@ -56,6 +57,10 @@ fun SignUpScreen(
     var showImageEditor by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val authState by authViewModel.authState.collectAsState()
+    val imageLoadState by authViewModel.imageLoadState.collectAsState()
+    val isLoading = authState is AuthViewModel.AuthState.Loading || 
+                  imageLoadState is ImageLoadState.Loading
 
     LaunchedEffect(authViewModel.authState) {
         authViewModel.authState.collect { state ->
@@ -142,7 +147,7 @@ fun SignUpScreen(
         )
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
@@ -156,298 +161,330 @@ fun SignUpScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp)
             .padding(top = 48.dp, bottom = 32.dp),
-        horizontalAlignment = Alignment.Start
+        contentAlignment = Alignment.Center
     ) {
-        // Top icon with animation
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 24.dp)
-        ) {
-            val infiniteTransition = rememberInfiniteTransition(label = "iconTransition")
-            val scale by infiniteTransition.animateFloat(
-                initialValue = 1f,
-                targetValue = 1.1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1000),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "iconScale"
-            )
-
-            Image(
-                painter = painterResource(id = R.drawable.ic_star),
-                contentDescription = "Star",
-                modifier = Modifier
-                    .size(32.dp)
-                    .scale(scale)
-                    .align(Alignment.TopEnd)
-            )
-        }
-
-        // Profile Image Picker centered
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 24.dp),
-            contentAlignment = Alignment.Center
+            horizontalAlignment = Alignment.Start
         ) {
-
-        }
-
-        // Header section
-        Text(
-            text = "Create account",
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.Black,
-            modifier = Modifier.padding(bottom = 32.dp)
-        )
-
-        // Username field with dark labels
-        Text(
-            text = "Username",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color.Black,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        TextField(
-            value = username,
-            onValueChange = { username = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-                .height(56.dp)
-                .border(
-                    width = 1.dp,
-                    color = Color.Black,
-                    shape = RoundedCornerShape(12.dp)
-                ),
-            colors = TextFieldDefaults.colors(
-                unfocusedContainerColor = Color.White,
-                focusedContainerColor = Color.White,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                cursorColor = Color.Black,
-                unfocusedTextColor = Color.Black,
-                focusedTextColor = Color.Black
-            ),
-            shape = RoundedCornerShape(12.dp),
-        )
-
-        // Email field
-        Text(
-            text = "Email",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color.Black,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        TextField(
-            value = email,
-            onValueChange = { email = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-                .height(56.dp)
-                .border(
-                    width = 1.dp,
-                    color = Color.Black,
-                    shape = RoundedCornerShape(12.dp)
-                ),
-            colors = TextFieldDefaults.colors(
-                unfocusedContainerColor = Color.White,
-                focusedContainerColor = Color.White,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                cursorColor = Color.Black,
-                unfocusedTextColor = Color.Black,
-                focusedTextColor = Color.Black
-            ),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        // Password field
-        Text(
-            text = "Password",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color.Black,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        TextField(
-            value = password,
-            onValueChange = { password = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-                .height(56.dp)
-                .border(
-                    width = 1.dp,
-                    color = Color.Black,
-                    shape = RoundedCornerShape(12.dp)
-                ),
-            colors = TextFieldDefaults.colors(
-                unfocusedContainerColor = Color.White,
-                focusedContainerColor = Color.White,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                cursorColor = Color.Black,
-                unfocusedTextColor = Color.Black,
-                focusedTextColor = Color.Black
-            ),
-            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            trailingIcon = {
-                IconButton(
-                    onClick = { passwordVisible = !passwordVisible }
-                ) {
-                    Icon(
-                        painter = painterResource(
-                            id = if (passwordVisible) R.drawable.ic_visibility_off else R.drawable.ic_visibility
-                        ),
-                        contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                        tint = Color.Gray
-                    )
-                }
-            },
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        // Driver's License field
-        Text(
-            text = "Driver's License Number",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color.Black,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        TextField(
-            value = driverLicense,
-            onValueChange = { driverLicense = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-                .height(56.dp)
-                .border(
-                    width = 1.dp,
-                    color = Color.Black,
-                    shape = RoundedCornerShape(12.dp)
-                ),
-            colors = TextFieldDefaults.colors(
-                unfocusedContainerColor = Color.White,
-                focusedContainerColor = Color.White,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                cursorColor = Color.Black,
-                unfocusedTextColor = Color.Black,
-                focusedTextColor = Color.Black
-            ),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        // Terms and conditions checkbox
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(
-                checked = termsAccepted,
-                onCheckedChange = { termsAccepted = it },
-                colors = CheckboxDefaults.colors(
-                    checkedColor = Color.White,
-                    uncheckedColor = Color.Gray
+            // Top icon with animation
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp)
+            ) {
+                val infiniteTransition = rememberInfiniteTransition(label = "iconTransition")
+                val scale by infiniteTransition.animateFloat(
+                    initialValue = 1f,
+                    targetValue = 1.1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1000),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "iconScale"
                 )
+
+                Image(
+                    painter = painterResource(id = R.drawable.ic_star),
+                    contentDescription = "Star",
+                    modifier = Modifier
+                        .size(32.dp)
+                        .scale(scale)
+                        .align(Alignment.TopEnd)
+                )
+            }
+            // Header section
+            Text(
+                text = "Create account",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black,
+                modifier = Modifier.padding(bottom = 32.dp)
             )
             Row(
+               horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { showTermsDialog = true }
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ){
+                ProfileImagePicker(
+                    currentImageUrl = null,
+                    onImageSelected = { uri ->
+                        selectedImageUri = uri
+                        showImageEditor = true
+                    },
+                    showImageEditor = showImageEditor,
+                    onDismissImageEditor = { showImageEditor = false },
+                    onSaveEditedImage = { showImageEditor = false },
+                    isLoading = imageLoadState is ImageLoadState.Loading
+                )
+            }
+
+
+            // Username field with dark labels
+            Text(
+                text = "Username",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.Black,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            TextField(
+                value = username,
+                onValueChange = { username = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+                    .height(56.dp)
+                    .border(
+                        width = 1.dp,
+                        color = Color.Black,
+                        shape = RoundedCornerShape(12.dp)
+                    ),
+                colors = TextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = Color.White,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    cursorColor = Color.Black,
+                    unfocusedTextColor = Color.Black,
+                    focusedTextColor = Color.Black
+                ),
+                shape = RoundedCornerShape(12.dp),
+            )
+
+            // Email field
+            Text(
+                text = "Email",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.Black,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            TextField(
+                value = email,
+                onValueChange = { email = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+                    .height(56.dp)
+                    .border(
+                        width = 1.dp,
+                        color = Color.Black,
+                        shape = RoundedCornerShape(12.dp)
+                    ),
+                colors = TextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = Color.White,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    cursorColor = Color.Black,
+                    unfocusedTextColor = Color.Black,
+                    focusedTextColor = Color.Black
+                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            // Password field
+            Text(
+                text = "Password",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.Black,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            TextField(
+                value = password,
+                onValueChange = { password = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+                    .height(56.dp)
+                    .border(
+                        width = 1.dp,
+                        color = Color.Black,
+                        shape = RoundedCornerShape(12.dp)
+                    ),
+                colors = TextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = Color.White,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    cursorColor = Color.Black,
+                    unfocusedTextColor = Color.Black,
+                    focusedTextColor = Color.Black
+                ),
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(
+                        onClick = { passwordVisible = !passwordVisible }
+                    ) {
+                        Icon(
+                            painter = painterResource(
+                                id = if (passwordVisible) R.drawable.ic_visibility_off else R.drawable.ic_visibility
+                            ),
+                            contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                            tint = Color.Gray
+                        )
+                    }
+                },
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            // Driver's License field
+            Text(
+                text = "Driver's License Number",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.Black,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            TextField(
+                value = driverLicense,
+                onValueChange = { driverLicense = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+                    .height(56.dp)
+                    .border(
+                        width = 1.dp,
+                        color = Color.Black,
+                        shape = RoundedCornerShape(12.dp)
+                    ),
+                colors = TextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = Color.White,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    cursorColor = Color.Black,
+                    unfocusedTextColor = Color.Black,
+                    focusedTextColor = Color.Black
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            // Terms and conditions checkbox
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = termsAccepted,
+                    onCheckedChange = { termsAccepted = it },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = Color.White,
+                        uncheckedColor = Color.Gray
+                    )
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { showTermsDialog = true }
+                ) {
+                    Text(
+                        text = "I accept the ",
+                        color = Color.Gray,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "terms and privacy policy",
+                        color = Color.Black,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+            }
+
+            // Sign Up button
+            Button(
+                onClick = {
+                    if (email.isNotEmpty() && password.isNotEmpty() && username.isNotEmpty() && driverLicense.isNotEmpty()) {
+                        if (termsAccepted) {
+                            authViewModel.signUpWithEmailPassword(
+                                email = email,
+                                password = password,
+                                username = username,
+                                driverLicense = driverLicense,
+                                profileImageUri = selectedImageUri,
+                                onComplete = { success ->
+                                    if (!success) {
+                                        showError = true
+                                        errorMessage = "Failed to create account"
+                                    } else {
+                                        onSignUpSuccess()
+                                        showToast(context = context, "Account created successfully")
+                                    }
+                                }
+                            )
+                        } else {
+                            showError = true
+                            errorMessage = "Please accept the terms and privacy policy"
+                            showToast(context, errorMessage)
+                        }
+                    } else {
+                        showError = true
+                        errorMessage = "Please fill in all fields"
+                        showToast(context, errorMessage)
+                    }
+                },
+                enabled = !isLoading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Black,
+                    disabledContainerColor = Color.Gray
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp)
+                    .height(56.dp)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(24.dp)
+                    )
+                } else {
+                    Text(
+                        "Create account",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+
+            // Sign in link
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "I accept the ",
+                    "Already have an account? ",
                     color = Color.Gray,
                     fontSize = 14.sp
                 )
-                Text(
-                    text = "terms and privacy policy",
-                    color = Color.Black,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(start = 4.dp)
-                )
-            }
-        }
-
-        // Sign Up button
-        AnimatedButton(
-            onClick = {
-                if (email.isNotEmpty() && password.isNotEmpty() && username.isNotEmpty() && driverLicense.isNotEmpty()) {
-                    if (termsAccepted) {
-                        authViewModel.signUpWithEmailPassword(
-                            email = email,
-                            password = password,
-                            username = username,
-                            driverLicense = driverLicense,
-                            onComplete = { success ->
-                                if (!success) {
-                                    showError = true
-                                    errorMessage = "Failed to create account"
-                                }else{
-                                    onSignUpSuccess()
-                                    showToast(context = context, "Account created successfully")
-                                }
-                            }
-                        )
-                    } else {
-                        showError = true
-                        errorMessage = "Please accept the terms and privacy policy"
-                        showToast(context, "Please accept the terms and privacy policy")
-                    }
-                } else {
-                    showError = true
-                    errorMessage = "Please fill in all fields"
-                    showToast(context, "Please fill in all fields")
+                TextButton(
+                    onClick = onSignInClick,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = Color.Black
+                    )
+                ) {
+                    Text(
+                        "Log in",
+                        color = Color.Black,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 24.dp)
-                .height(56.dp)
-                .clip(RoundedCornerShape(12.dp))
-        ) {
-            Text(
-                "Create account",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-        }
-
-        // Sign in link
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "Already have an account? ",
-                color = Color.Gray,
-                fontSize = 14.sp
-            )
-            AnimatedTextButton(
-                onClick = onSignInClick
-            ) {
-                Text(
-                    "Log in",
-                    color = Color.Black,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
             }
         }
     }

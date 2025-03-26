@@ -57,7 +57,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.8.8")
     implementation ("io.coil-kt:coil-compose:2.5.0")
     implementation ("io.coil-kt:coil:2.5.0")
-
+    implementation("com.google.firebase:firebase-vertexai")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
