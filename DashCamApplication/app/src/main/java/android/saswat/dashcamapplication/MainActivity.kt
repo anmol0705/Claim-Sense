@@ -12,7 +12,6 @@ import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,13 +34,6 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-
-import android.content.ContentValues.TAG
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -50,21 +42,21 @@ import android.util.Size
 import androidx.compose.material3.Icon
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.graphics.Color
-
 import kotlinx.coroutines.*
-import java.nio.FloatBuffer
-import java.util.concurrent.Executors
-import com.google.firebase.FirebaseApp
 import java.util.Locale
+import com.google.firebase.FirebaseApp
+import java.util.concurrent.Executors
+import androidx.camera.core.ExperimentalGetImage
 
 private const val TAG = "MainActivity"
+private const val PROCESS_EVERY_N_FRAMES = 1
 
 class MainActivity : ComponentActivity(), SensorEventListener {
     private lateinit var sensorManager: SensorManager
     private val viewModel: DashCamViewModel by viewModels {
         DashCamViewModel.Factory(application)
     }
-    
+
     // Debug variables to track sensor activity
     private var lastAccelUpdate = 0L
     private var lastGyroUpdate = 0L
@@ -73,14 +65,14 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         try {
             // Ensure Firebase is properly initialized
             if (FirebaseApp.getApps(this).isEmpty()) {
                 Log.w(TAG, "Firebase not initialized in Application class, initializing now")
                 FirebaseApp.initializeApp(this)
             }
-            
+
             val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
                 when {
                     permissions[Manifest.permission.CAMERA] == true && permissions[Manifest.permission.RECORD_AUDIO] == true -> {
@@ -108,7 +100,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             } else {
                 permissionLauncher.launch(requiredPermissions)
             }
-            
+
             // Initialize sensor manager
             sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         } catch (e: Exception) {
@@ -131,27 +123,51 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     @Composable
     private fun DashcamApp() {
-        // Check if the app has the required model file
-        val assetExists = remember {
+        // Check if the app has the required model files
+        val sensoryModelExists = remember {
             try {
                 applicationContext.assets.open("sensory_model.onnx").use { it.close() }
                 true
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to verify model existence", e)
+                Log.e(TAG, "Failed to verify sensory model existence", e)
+                false
+            }
+        }
+        
+        val yoloModelExists = remember {
+            try {
+                applicationContext.assets.open("yolov8n.onnx").use { it.close() }
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to verify YOLO model existence", e)
                 false
             }
         }
 
-        if (!assetExists) {
-            ErrorScreen("Required model file is missing. Please reinstall the app.")
+        if (!sensoryModelExists) {
+            ErrorScreen("Required sensory model file is missing. Please reinstall the app.")
+            return
+        }
+        
+        if (!yoloModelExists) {
+            ErrorScreen("Required YOLO model file is missing. Please reinstall the app.")
             return
         }
 
         // Observe ViewModel states
         val authState by remember { viewModel.authState }.collectAsState(initial = AuthState())
-        val modelState by remember { viewModel.modelState }.collectAsState(initial = ModelState())  
+        val modelState by remember { viewModel.modelState }.collectAsState(initial = ModelState())
         val riskScore by remember { viewModel.riskScore }.collectAsState(initial = 50f)
-        
+        val imageRiskScore by remember { viewModel.imageRiskScore }.collectAsState(initial = 50f)
+
+        // Add a debug text to display image risk score
+        LaunchedEffect(Unit) {
+            while(true) {
+                delay(1000)
+                Log.d(TAG, "Current risk values - Combined: ${riskScore}, Image: ${imageRiskScore}")
+            }
+        }
+
         if (!authState.isAuthenticated) {
             // Authentication screen
             LoginScreen(
@@ -175,7 +191,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             }
         } else {
             // Main app UI
-            DashcamUI(riskScore)
+            DashcamUI(riskScore, imageRiskScore)
         }
     }
 
@@ -210,7 +226,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                         style = MaterialTheme.typography.headlineMedium,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
-                    
+
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
@@ -219,7 +235,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                             .fillMaxWidth()
                             .padding(vertical = 8.dp)
                     )
-                    
+
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
@@ -229,7 +245,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                             .fillMaxWidth()
                             .padding(vertical = 8.dp)
                     )
-                    
+
                     errorMessage?.let {
                         Text(
                             text = it,
@@ -238,7 +254,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                             modifier = Modifier.padding(vertical = 8.dp)
                         )
                     }
-                    
+
                     Button(
                         onClick = {
                             if (email.isNotEmpty() && password.isNotEmpty()) {
@@ -264,36 +280,38 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
+    @androidx.annotation.OptIn(ExperimentalGetImage::class)
     @Composable
-    private fun DashcamUI(riskScore: Float) {
+    private fun DashcamUI(riskScore: Float, imageRiskScore: Float) {
         var errorMessage by remember { mutableStateOf<String?>(null) }
         val context = LocalContext.current
         val lifecycleOwner = LocalLifecycleOwner.current
         val previewView = remember { PreviewView(context) }
         var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
-        
+
         // Track sensor data for UI display
         var sensorDebugInfo by remember { mutableStateOf("Waiting for sensor data...") }
-        
+
         // Risk level based on risk score
         val riskLevel = when {
             riskScore >= 70 -> "High Risk"
             riskScore >= 40 -> "Moderate Risk"
             else -> "Low Risk"
         }
-        
+
         // Risk color based on risk score
         val riskColor = when {
             riskScore >= 70 -> Color.Red
             riskScore >= 40 -> Color(0xFFFF9800) // Orange
             else -> Color(0xFF4CAF50) // Green
         }
-        
+
         // Update sensor debug info every second
+
         LaunchedEffect(Unit) {
-            while(true) {
+            while (true) {
                 delay(1000)
-                viewModel.getSensorDebugInfo()?.let {
+                viewModel.getSensorDebugInfo().let {
                     sensorDebugInfo = it
                 }
             }
@@ -331,15 +349,27 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     .setTargetResolution(Size(320, 320))
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
-                
-                analysis.setAnalyzer(Executors.newSingleThreadExecutor()) { image ->
-                    try {
-                        viewModel.calculateAndStoreRisk()
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error processing image", e)
-                    } finally {
-                        image.close()
+
+                analysis.setAnalyzer(Executors.newSingleThreadExecutor()) { imageProxy ->
+                    @OptIn(ExperimentalGetImage::class)
+                    val image = imageProxy.image
+                    if (image != null){
+                        try {
+                            val planes = image.planes
+                            val buffer = planes[0].buffer
+                            val bytes = ByteArray(buffer.capacity())
+                            buffer.get(bytes)
+                            viewModel.processImageData(bytes, image.width, image.height)
+                            Log.d(TAG, "Image processed: ${image.width}x${image.height}, buffer size: ${buffer.capacity()}")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error processing image", e)
+                        } finally {
+                            imageProxy.close()
+                        }
+                    }else{
+                        imageProxy.close()
                     }
+                    viewModel.calculateAndStoreRisk()
                 }
 
                 try {
@@ -374,7 +404,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     .fillMaxSize()
                     .padding(bottom = 160.dp) // Make room for overlay at bottom
             )
-            
+
             // Error message overlay
             errorMessage?.let {
                 Card(
@@ -393,7 +423,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     )
                 }
             }
-            
+
             // Bottom panel with risk score and sensor data
             Card(
                 modifier = Modifier
@@ -441,28 +471,50 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = riskColor
                                 )
+                                Text(
+                                    text = "Image Risk: ${String.format(Locale.US, "%.1f", imageRiskScore)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = riskColor
+                                )
                             }
                         }
-                        
+
                         // Calculate risk button
-                        Button(
-                            onClick = { 
-                                viewModel.calculateAndStoreRisk() 
-                                viewModel.resetAutoSignoutTimer()  // Reset timer on button click
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            ),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("Calculate Risk")
+                        Column {
+                            Button(
+                                onClick = {
+                                    viewModel.calculateAndStoreRisk()
+                                    viewModel.resetAutoSignoutTimer() // Reset timer on button click
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Calculate Risk")
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            Button(
+                                onClick = {
+                                    viewModel.forceImageUpdate()
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Force Image Update")
+                            }
                         }
                     }
-                    
+
                     // Expandable sensor debug info
                     var showSensorInfo by remember { mutableStateOf(false) }
-                    
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -485,14 +537,14 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Icon(
-                                    imageVector = if (showSensorInfo) 
-                                        Icons.Default.KeyboardArrowUp 
-                                    else 
+                                    imageVector = if (showSensorInfo)
+                                        Icons.Default.KeyboardArrowUp
+                                    else
                                         Icons.Default.KeyboardArrowDown,
                                     contentDescription = "Expand"
                                 )
                             }
-                            
+
                             AnimatedVisibility(visible = showSensorInfo) {
                                 Text(
                                     text = sensorDebugInfo,
@@ -556,12 +608,12 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
             Log.i(TAG, "Accelerometer sensor registered")
         } ?: Log.w(TAG, "No accelerometer available on this device")
-        
+
         sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
             Log.i(TAG, "Gyroscope sensor registered")
         } ?: Log.w(TAG, "No gyroscope available on this device")
-        
+
         // Notify ViewModel that app is in foreground
         viewModel.onAppForeground()
     }
@@ -569,7 +621,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     override fun onPause() {
         super.onPause()
         sensorManager.unregisterListener(this)
-        
+
         // Notify ViewModel that app is in background
         viewModel.onAppBackground()
     }

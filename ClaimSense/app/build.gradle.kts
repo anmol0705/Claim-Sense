@@ -20,6 +20,7 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        buildConfigField("String", "GEMINI_API_KEY", "\"${System.getenv("GEMINI_API_KEY") ?: "AIzaSyBypUhpkxssGfe_wLP6c2XMD8SNL3GZsR0"}\"")
     }
 
     buildTypes {
@@ -40,6 +41,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -58,6 +60,7 @@ dependencies {
     implementation ("io.coil-kt:coil-compose:2.5.0")
     implementation ("io.coil-kt:coil:2.5.0")
     implementation("com.google.firebase:firebase-vertexai")
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

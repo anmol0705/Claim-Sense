@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Dash Cam Application"
 include(":app")
- 
+include(":opencv")

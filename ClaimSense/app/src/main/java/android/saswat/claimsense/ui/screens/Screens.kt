@@ -9,4 +9,5 @@ sealed class Screens(val route: String) {
     object Claims : Screens("claims")
     object Profile : Screens("profile")
     object RiskScore : Screens("risk_score")
+    object Chat : Screens("chat") // Add this new route
 }

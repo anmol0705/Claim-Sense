@@ -61,7 +61,7 @@ class FirestoreRepository {
     }
 
     // Claim operations
-    suspend fun createClaim(claim: Claim) = withContext(Dispatchers.IO) {
+    suspend fun createClaim(claim: Claim): Void? = withContext(Dispatchers.IO) {
         claimsCollection.document(claim.id)
             .set(claim)
             .await()
@@ -77,7 +77,7 @@ class FirestoreRepository {
         emit(claims)
     }
 
-    suspend fun updateClaimStatus(claimId: String, status: ClaimStatus) = withContext(Dispatchers.IO) {
+    suspend fun updateClaimStatus(claimId: String, status: ClaimStatus): Void? = withContext(Dispatchers.IO) {
         claimsCollection.document(claimId)
             .update("status", status)
             .await()
