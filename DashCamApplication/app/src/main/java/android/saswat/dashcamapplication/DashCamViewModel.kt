@@ -101,6 +101,9 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     private var laneDetectionEnabled = true
     private var lastProcessedFrame: Mat? = null
     private val relative_speeds = ConcurrentLinkedDeque<Float>()
+    private var sensorMinValues: FloatArray = FloatArray(6) { Float.MAX_VALUE }
+    private var sensorMaxValues: FloatArray = FloatArray(6) { Float.MIN_VALUE }
+    private var isSensorDataInitialized = false
 
     init {
         if (OpenCVLoader.initDebug()) {
@@ -216,11 +219,42 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         lastSensorUpdate = System.currentTimeMillis()
+        updateSensorMinMax(sensorData)
         resetAutoSignoutTimer()
     }
 
+    private fun updateSensorMinMax(data: FloatArray) {
+        if (!isSensorDataInitialized) {
+            sensorMinValues = data.copyOf()
+            sensorMaxValues = data.copyOf()
+            isSensorDataInitialized = true
+        } else {
+            for (i in 0 until 6) {
+                sensorMinValues[i] = minOf(sensorMinValues[i], data[i])
+                sensorMaxValues[i] = maxOf(sensorMaxValues[i], data[i])
+            }
+        }
+    }
+
+    private fun normalizeSensorData(data: FloatArray): FloatArray {
+        if (!isSensorDataInitialized) {
+            return data.copyOf()
+        }
+        val normalizedData = FloatArray(6)
+        for (i in 0 until 6) {
+            val range = sensorMaxValues[i] - sensorMinValues[i]
+            normalizedData[i] = if (range != 0f) {
+                (data[i] - sensorMinValues[i]) / range
+            } else {
+                0f
+            }
+        }
+        return normalizedData
+    }
+
     fun calculateAndStoreRisk() {
-        val sensoryRisk = calculateRisk()
+        val normalizedSensorData = normalizeSensorData(sensorData)
+        val sensoryRisk = calculateRisk(normalizedSensorData)
         _sensoryRiskScore.value = sensoryRisk
         updateCombinedRiskScore()
         resetAutoSignoutTimer()
@@ -231,10 +265,10 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         val imageRisk = _imageRiskScore.value
         val combinedRisk = combine_risk_scores(sensoryRisk, imageRisk)
         val smoothedRisk = smoothRiskScore(combinedRisk)
-        
+
         Log.d(TAG, "Risk scores - Sensory: $sensoryRisk, Image: $imageRisk, Combined: $combinedRisk, Smoothed: $smoothedRisk")
         Log.d(TAG, "Risk weights - Sensory: $SENSORY_WEIGHT, Image: $IMAGE_WEIGHT")
-        
+
         _riskScore.value = smoothedRisk
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastRiskStorageTime >= RISK_STORAGE_INTERVAL_MS) {
@@ -254,40 +288,40 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             riskHistory.removeFirst()
         }
         riskHistory.addLast(newRisk)
-        
+
         // Calculate historical score
         val historicalScore = if (riskHistory.isNotEmpty()) {
             riskHistory.average().toFloat()
         } else {
             newRisk
         }
-        
+
         // Apply exponential weighted moving average smoothing
         val ewmSmoothedRisk = lastCalculatedRisk + RISK_SMOOTHING_FACTOR * (newRisk - lastCalculatedRisk)
-        
+
         // Combine current and historical scores
         val finalScore = CURRENT_WEIGHT * ewmSmoothedRisk + HISTORY_WEIGHT * historicalScore
-        
+
         // Update the last calculated risk
         lastCalculatedRisk = ewmSmoothedRisk
-        
+
         // Apply threshold to prevent large jumps
         val previousScore = _riskScore.value
         val scoreDifference = finalScore - previousScore
-        
+
         val smoothedScore = if (abs(scoreDifference) > MAX_RISK_CHANGE_THRESHOLD) {
             previousScore + sign(scoreDifference) * MAX_RISK_CHANGE_THRESHOLD
         } else {
             finalScore
         }
-        
+
         // Ensure risk score is never negative
         return maxOf(0f, smoothedScore)
     }
 
-    private fun calculateRisk(): Float {
+    private fun calculateRisk(data: FloatArray): Float {
         try {
-            if (sensorData.all { it == 0f }) {
+            if (data.all { it == 0f }) {
                 Log.w(TAG, "Cannot calculate risk: all sensor data is zero")
                 return DEFAULT_RISK_SCORE
             }
@@ -299,7 +333,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             val env = OrtEnvironment.getEnvironment()
             var sensoryTensor: OnnxTensor? = null
             try {
-                sensoryTensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(sensorData), longArrayOf(1, 6))
+                sensoryTensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(data), longArrayOf(1, 6))
                 val outputs = session.run(mapOf("float_input" to sensoryTensor))
                 val outputTensor = outputs.get(0)
                 return when (val outputValue = outputTensor.value) {
@@ -979,7 +1013,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         val data = hashMapOf(
             "uid" to uid,
             "timestamp" to System.currentTimeMillis(),
-            "combinedRisk" to maxOf(0f, combinedRisk),  // Ensure positive values
+            "risk" to maxOf(0f, combinedRisk),  // Ensure positive values
             "sensoryRisk" to maxOf(0f, sensoryRisk),    // Ensure positive values
             "imageRisk" to maxOf(0f, imageRisk)         // Ensure positive values
         )
