@@ -76,9 +76,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     
                     // Use streaming for more responsive UI
                     val riskContext = buildRiskContext()
+                    android.util.Log.d("ChatViewModel", "Sending message with risk context")
                     val responseBuilder = StringBuilder()
                     
-                    // Collect the streaming response and update the message progressively
+                    // Always pass the risk context with each message for consistency
                     geminiChatService.sendMessageStream(userMessage, riskContext).collect { chunk ->
                         responseBuilder.append(chunk)
                         
@@ -181,17 +182,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
                 val riskDoc = firestore.collection("users")
                     .document(userId)
-                    .collection("risk_data")
+                    .collection("risk_scores")
                     .document("latest")
                     .get()
                     .await()
 
                 if (riskDoc.exists()) {
                     _riskData.value = riskDoc.data
+                    android.util.Log.d("ChatViewModel", "Risk data updated: ${riskDoc.data}")
                     
-                    // Update Gemini with latest risk context when data changes
-                    val riskContext = buildRiskContext()
-                    geminiChatService.sendMessage("Please note this updated user risk information. Don't respond to this message.", riskContext)
+                    // Just update the risk context without sending a message
                 }
             } catch (e: Exception) {
                 // Handle error silently
@@ -203,9 +203,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val riskData = _riskData.value ?: return "You are an assistant for ClaimSense, an insurance claims app."
 
         val riskScore = riskData["riskScore"] as? Double ?: 0.0
-        val accelerometerData = riskData["accelerometer"] as? Map<String, Double>
-        val gyroscopeData = riskData["gyroscope"] as? Map<String, Double>
+        val accelerometerData = riskData["accelerometer"] as? Map<*, *>
+        val gyroscopeData = riskData["gyroscope"] as? Map<*, *>
 
+        android.util.Log.d("ChatViewModel", "Building context with risk score: $riskScore")
+        
         return """
             You are an assistant for ClaimSense, an insurance claims app.
             The user's current risk score is $riskScore out of 100.
@@ -226,6 +228,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             - High values suggest sharp turns or unstable driving
             
             Keep responses helpful, specific to their data, and under 150 words.
+            
+            Remember user information across the conversation, including their name if they introduced themselves.
         """.trimIndent()
     }
 
