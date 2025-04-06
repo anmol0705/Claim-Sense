@@ -240,16 +240,12 @@ fun MainScreen(
                 TopAppBar(
                     title = { 
                         when(currentScreen) {
-                            Screens.Dashboard.route -> Text("Dashboard")
-                            Screens.Vehicles.route -> Text("My Vehicles")
-                            Screens.Claims.route -> Text("Claims")
-                            Screens.Profile.route -> Text(
-                                text = "Welcome back, ${userData?.username ?: "user"}",
-                                fontSize = 20.sp,  
-                                color = Color.White
-                            )
-                            Screens.RiskScore.route -> Text("Risk Score")
-                            Screens.Chat.route -> Text("AI Assistant")
+                            Screens.Dashboard.route -> Text("DASHBOARD")
+                            Screens.Vehicles.route -> Text("VEHICLES OWNED")
+                            Screens.Claims.route -> Text("CLAIMS")
+                            Screens.Profile.route -> Text("PROFILE")
+                            Screens.RiskScore.route -> Text("RISK SCORE")
+                            Screens.Chat.route -> Text("AI ASSISTANT")
                             else -> Text("ClaimSense")
                         }
                     },
@@ -268,19 +264,7 @@ fun MainScreen(
                             Icon(Icons.Filled.Menu, contentDescription = "Menu")
                         }
                     },
-                    actions = {
-                        if (currentScreen == Screens.Vehicles.route) {
-                            IconButton(
-                                onClick = { showAddVehicleDialog = true }
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = "Add Vehicle",
-                                    tint = Color.White
-                                )
-                            }
-                        }
-                    },
+
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Black,
                         titleContentColor = Color.White,
@@ -339,222 +323,12 @@ fun MainScreen(
                     ChatScreen(chatViewModel)
                 }
             }
-            if (showAddVehicleDialog) {
-                AddVehicleDialog(
-                    onDismiss = { 
-                        showAddVehicleDialog = false 
-                    },
-                    onAdd = { make, model, year, licensePlate ->
-                        vehicleViewModel.addVehicle(
-                            make = make,
-                            model = model,
-                            year = year,
-                            licensePlate = licensePlate
-                        )
-                    }
-                )
-            }
+
         }
     }
 }
 
-@Composable
-private fun AddVehicleDialog(
-    onDismiss: () -> Unit,
-    onAdd: (String, String, Int, String) -> Unit
-) {
-    var make by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("") }
-    var year by remember { mutableStateOf("") }
-    var licensePlate by remember { mutableStateOf("") }
-    var hasError by remember { mutableStateOf(false) }
-    var isSubmitting by remember { mutableStateOf(false) }
-    val context = LocalContext.current
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        properties = DialogProperties(
-            dismissOnClickOutside = !isSubmitting,
-            dismissOnBackPress = !isSubmitting
-        ),
-        title = { 
-            Text(
-                "Add New Vehicle",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                OutlinedTextField(
-                    value = make,
-                    onValueChange = { 
-                        make = it
-                        hasError = false
-                    },
-                    label = { Text("Make") },
-                    placeholder = { Text("e.g., Toyota") },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isSubmitting,
-                    isError = hasError && make.isBlank(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Black,
-                        unfocusedBorderColor = Color.Gray,
-                        focusedLabelColor = Color.Black,
-                    ),
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = model,
-                    onValueChange = { 
-                        model = it
-                        hasError = false
-                    },
-                    label = { Text("Model") },
-                    placeholder = { Text("e.g., Camry") },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isSubmitting,
-                    isError = hasError && model.isBlank(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Black,
-                        unfocusedBorderColor = Color.Gray,
-                        focusedLabelColor = Color.Black,
-                    ),
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = year,
-                    onValueChange = { 
-                        if (it.length <= 4 && it.all { char -> char.isDigit() }) {
-                            year = it
-                            hasError = false
-                        }
-                    },
-                    label = { Text("Year") },
-                    placeholder = { Text("e.g., 2024") },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isSubmitting,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    isError = hasError && (year.toIntOrNull() == null || year.toInt() < 1900),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Black,
-                        unfocusedBorderColor = Color.Gray,
-                        focusedLabelColor = Color.Black,
-                    ),
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = licensePlate,
-                    onValueChange = { 
-                        licensePlate = it.uppercase()
-                        hasError = false
-                    },
-                    label = { Text("License Plate") },
-                    placeholder = { Text("e.g., ABC123") },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isSubmitting,
-                    isError = hasError && licensePlate.isBlank(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Black,
-                        unfocusedBorderColor = Color.Gray,
-                        focusedLabelColor = Color.Black,
-                    ),
-                    singleLine = true
-                )
-
-                if (hasError) {
-                    Text(
-                        "Please fill all fields correctly",
-                        color = Color.Red,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (make.isBlank() || model.isBlank() || 
-                        year.toIntOrNull() == null || licensePlate.isBlank()) {
-                        hasError = true
-                        Toast.makeText(context, "Please fill all fields correctly", Toast.LENGTH_SHORT).show()
-                    } else {
-                        try {
-                            val yearInt = year.toInt()
-                            if (yearInt < 1900 || yearInt > 2024) {
-                                hasError = true
-                                Toast.makeText(context, "Please enter a valid year", Toast.LENGTH_SHORT).show()
-                            } else {
-                                isSubmitting = true
-                                onAdd(make, model, yearInt, licensePlate)
-                            }
-                        } catch (_: Exception) {
-                            hasError = true
-                            Toast.makeText(context, "Invalid year format", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                },
-                enabled = !isSubmitting,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Black,
-                    disabledContainerColor = Color.Gray
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                if (isSubmitting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text(
-                        "Add Vehicle",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        },
-        dismissButton = {
-            if (!isSubmitting) {
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = Color.Black
-                    )
-                ) {
-                    Text(
-                        "Cancel",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
-    )
-}
 
 
 

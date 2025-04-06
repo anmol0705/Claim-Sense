@@ -19,6 +19,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import coil.decode.BitmapFactoryDecoder
+import coil.transform.CircleCropTransformation
 
 @Composable
 fun ProfileImagePicker(
@@ -67,6 +69,10 @@ fun ProfileImagePicker(
                     model = ImageRequest.Builder(context)
                         .data(selectedImageUri ?: currentImageUrl)
                         .crossfade(true)
+                        .decoderFactory(BitmapFactoryDecoder.Factory())
+                        .transformations(
+                            CircleCropTransformation() // Optional: keeps the image as a circle
+                        )
                         .build(),
                     contentDescription = "Profile image",
                     modifier = Modifier.fillMaxSize(),
@@ -108,6 +114,7 @@ fun ProfileImagePicker(
                         model = ImageRequest.Builder(context)
                             .data(selectedImageUri)
                             .crossfade(true)
+                            .decoderFactory(BitmapFactoryDecoder.Factory())
                             .build(),
                         contentDescription = "Edit profile image",
                         modifier = Modifier.fillMaxSize(),

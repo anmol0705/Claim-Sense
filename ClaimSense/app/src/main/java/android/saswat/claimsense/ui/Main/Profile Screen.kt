@@ -21,9 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -78,10 +77,16 @@ fun ProfileContent(
                 isEditing = false
                 authViewModel.resetUpdateState()
             }
+
             is UpdateState.Error -> {
-                Toast.makeText(context, (updateState as UpdateState.Error).message, Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    (updateState as UpdateState.Error).message,
+                    Toast.LENGTH_SHORT
+                ).show()
                 authViewModel.resetUpdateState()
             }
+
             else -> {}
         }
     }
@@ -91,358 +96,337 @@ fun ProfileContent(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.Start
+                .padding(horizontal = 16.dp)
         ) {
-            item {
-                // Profile Image section at the top
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    ProfileImagePicker(
-                        currentImageUrl = userData?.profileImageUrl,
-                        onImageSelected = { uri ->
-                            selectedImageUri = uri
-                            showImageEditor = true
-                        },
-                        modifier = Modifier
-                            .size(140.dp)
-                            .border(
-                                width = 2.dp,
-                                brush = Brush.linearGradient(
-                                    listOf(
-                                        Color(0xFF00E5FF),
-                                        Color(0xFF00B3CC)
-                                    )
-                                ),
-                                shape = RoundedCornerShape(100)
-                            ),
-                        showImageEditor = showImageEditor,
-                        onDismissImageEditor = { showImageEditor = false },
-                        onSaveEditedImage = {
-                            selectedImageUri?.let { uri ->
-                                authViewModel.updateProfileImage(uri) { success ->
-                                    if (success) {
-                                        Toast.makeText(context, "Profile image updated!", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
-                            showImageEditor = false
-                        }
-                    )
-                }
+            // Profile header
 
-                // Info Card with enhanced styling
-                Card(
+
+            // Single card with two sections
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF212C3B).copy(alpha = 0.7f)
+                )
+            ) {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 24.dp)
-                        // Add subtle animation when appearing
-                        .animateContentSize()
-                        // Add elevation effect
-                        .shadow(
-                            elevation = 8.dp,
-                            shape = RoundedCornerShape(16.dp),
-                            spotColor = Color(0xFF00E5FF).copy(alpha = 0.2f)
-                        ),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.Transparent
-                    )
                 ) {
+                    // Header section
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 16.dp)
+                    ) {
+                        // Hello, Username text
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "HELLO, ",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Normal,
+                                color = Color.LightGray,
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                letterSpacing = 1.sp
+                            )
+                            Text(
+                                text = userData?.username?.uppercase() ?: "USERNAME",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Profile Image
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            ProfileImagePicker(
+                                currentImageUrl = userData?.profileImageUrl,
+                                onImageSelected = { uri ->
+                                    selectedImageUri = uri
+                                    showImageEditor = true
+                                },
+                                modifier = Modifier
+                                    .size(140.dp)
+                                    .border(
+                                        width = 3.dp,
+                                        color = Color(0xFF0E0D0C),
+                                        shape = CircleShape
+                                    ),
+                                showImageEditor = showImageEditor,
+                                onDismissImageEditor = { showImageEditor = false },
+                                onSaveEditedImage = {
+                                    selectedImageUri?.let { uri ->
+                                        authViewModel.updateProfileImage(uri) { success ->
+                                            if (success) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Profile image updated!",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        }
+                                    }
+                                    showImageEditor = false
+                                }
+                            )
+                        }
+                    }
+
+                    // User Information section with blur effect
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        Color(0xFF1E1E1E),
-                                        Color(0xFF252525)
-                                    ),
-                                    start = Offset(0f, 0f),
-                                    end = Offset(1000f, 1000f)
-                                )
-                            )
-                            // Add subtle border glow
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.linearGradient(
-                                    listOf(
-                                        Color(0xFF303030),
-                                        Color(0xFF00E5FF).copy(alpha = 0.3f),
-                                        Color(0xFF303030)
-                                    )
-                                ),
-                                shape = RoundedCornerShape(16.dp)
-                            )
+                            .padding(horizontal = 5.dp, vertical = 8.dp)
                     ) {
-                        Column(
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .shadow(
+                                    elevation = 8.dp,
+                                    shape = RoundedCornerShape(16.dp),
+                                    clip = true
+                                )
+                                .background(
+                                    Color(0xFF2E4053),
+                                    RoundedCornerShape(16.dp)
+                                )
                                 .padding(24.dp)
                         ) {
-                            // Header with accent line
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            if (isEditing) {
                                 Column {
-                                    Text(
-                                        text = "Your Information",
-                                        fontSize = 20.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Box(
+                                    TextField(
+                                        value = editedUsername,
+                                        onValueChange = { editedUsername = it },
+                                        label = { Text("Username") },
                                         modifier = Modifier
-                                            .width(60.dp)
-                                            .height(2.dp)
-                                            .background(
-                                                brush = Brush.horizontalGradient(
-                                                    colors = listOf(
-                                                        Color(0xFF00E5FF),
-                                                        Color(0xFF00E5FF).copy(alpha = 0.3f)
-                                                    )
-                                                ),
-                                                shape = RoundedCornerShape(1.dp)
-                                            )
+                                            .fillMaxWidth()
+                                            .padding(bottom = 16.dp)
+                                            .shadow(elevation = 4.dp, shape = RoundedCornerShape(8.dp)),
+                                        colors = TextFieldDefaults.colors(
+                                            unfocusedContainerColor = Color(0xFF2A3440),
+                                            focusedContainerColor = Color(0xFF2A3440),
+                                            unfocusedIndicatorColor = Color.Transparent,
+                                            focusedIndicatorColor = Color.Transparent,
+                                            cursorColor = Color(0xFF00E5FF),
+                                            unfocusedTextColor = Color.White,
+                                            focusedTextColor = Color.White,
+                                            unfocusedLabelColor = Color.Gray,
+                                            focusedLabelColor = Color(0xFF00E5FF)
+                                        ),
+                                        shape = RoundedCornerShape(8.dp)
                                     )
-                                }
 
-                                TextButton(
-                                    onClick = {
-                                        if (isEditing) {
-                                            if (editedUsername.isNotBlank()) {
-                                                authViewModel.updateUserData(
-                                                    editedUsername,
-                                                    editedDriverLicense
+                                    // Driver's License field
+                                    TextField(
+                                        value = editedDriverLicense,
+                                        onValueChange = { editedDriverLicense = it },
+                                        label = { Text("Driver's License") },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 24.dp)
+                                            .shadow(elevation = 4.dp, shape = RoundedCornerShape(8.dp)),
+                                        colors = TextFieldDefaults.colors(
+                                            unfocusedContainerColor = Color(0xFF2A3440),
+                                            focusedContainerColor = Color(0xFF2A3440),
+                                            unfocusedIndicatorColor = Color.Transparent,
+                                            focusedIndicatorColor = Color.Transparent,
+                                            cursorColor = Color(0xFF00E5FF),
+                                            unfocusedTextColor = Color.White,
+                                            focusedTextColor = Color.White,
+                                            unfocusedLabelColor = Color.Gray,
+                                            focusedLabelColor = Color(0xFF00E5FF)
+                                        ),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+
+                                    // Save and Cancel buttons
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        TextButton(
+                                            onClick = {
+                                                isEditing = false
+                                                authViewModel.resetUpdateState()
+                                            }
+                                        ) {
+                                            Text("CANCEL", color = Color.LightGray)
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                if (editedUsername.isNotBlank()) {
+                                                    authViewModel.updateUserData(
+                                                        editedUsername,
+                                                        editedDriverLicense
+                                                    )
+                                                } else {
+                                                    Toast.makeText(
+                                                        context,
+                                                        "Username cannot be empty",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
+                                            },
+                                            enabled = updateState !is UpdateState.Loading,
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = Color(0xFF00E5FF),
+                                                contentColor = Color.Black
+                                            ),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            if (updateState is UpdateState.Loading) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(16.dp),
+                                                    color = Color.Black,
+                                                    strokeWidth = 2.dp
                                                 )
                                             } else {
-                                                Toast.makeText(context, "Username cannot be empty", Toast.LENGTH_SHORT).show()
+                                                Text("SAVE")
                                             }
-                                        } else {
-                                            isEditing = true
                                         }
-                                    },
-                                    enabled = updateState !is UpdateState.Loading,
-                                    colors = ButtonDefaults.textButtonColors(
-                                        contentColor = Color(0xFF00E5FF)
-                                    ),
-                                    modifier = Modifier
-                                        .background(
-                                            color = Color(0xFF2A2A2A),
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(horizontal = 8.dp)
-                                ) {
-                                    if (updateState is UpdateState.Loading) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(16.dp),
-                                            color = Color(0xFF00E5FF),
-                                            strokeWidth = 2.dp
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
                                     }
-                                    Text(
-                                        when {
-                                            updateState is UpdateState.Loading -> "Saving..."
-                                            isEditing -> "Save"
-                                            else -> "Edit"
-                                        },
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
-
-                            // Edit mode or display mode content
-                            if (isEditing) {
-                                // Edit Fields with enhanced styling
-                                EditField(
-                                    label = "Username",
-                                    value = editedUsername,
-                                    onValueChange = { editedUsername = it }
-                                )
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                EditField(
-                                    label = "Driver's License",
-                                    value = editedDriverLicense,
-                                    onValueChange = { editedDriverLicense = it }
-                                )
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Button(
-                                    onClick = {
-                                        isEditing = false
-                                        authViewModel.resetUpdateState()
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(48.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFF2A2A2A),
-                                        contentColor = Color.White
-                                    ),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text("Cancel")
                                 }
                             } else {
-                                // Enhanced info display
-                                EnhancedInfoRow(label = "Username", value = userData?.username ?: "Not set")
-                                EnhancedInfoRow(label = "Email", value = userData?.email ?: "Not set")
-                                EnhancedInfoRow(label = "Driver's License", value = userData?.driverLicense ?: "Not set")
-                                EnhancedInfoRow(label = "User ID", value = userData?.userId ?: "Not set", isLast = true)
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 16.dp)
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = "USER ID :",
+                                                fontSize = 16.sp,
+                                                color = Color.LightGray,
+                                                modifier = Modifier.padding(bottom = 4.dp)
+                                            )
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(
+                                                        Color(0xFF273548),
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .shadow(elevation = 4.dp, shape = RoundedCornerShape(8.dp))
+                                                    .padding(vertical = 12.dp, horizontal = 16.dp)
+                                            ) {
+                                                Text(
+                                                    text = userData?.userId?.takeLast(6)
+                                                        ?: "121121",
+                                                    fontSize = 16.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = Color.White
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 16.dp)
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = "EMAIL :",
+                                                fontSize = 16.sp,
+                                                color = Color.LightGray,
+                                                modifier = Modifier.padding(bottom = 4.dp)
+                                            )
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(
+                                                        Color(0xFF273548),
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .shadow(elevation = 4.dp, shape = RoundedCornerShape(8.dp))
+                                                    .padding(vertical = 12.dp, horizontal = 16.dp)
+                                            ) {
+                                                Text(
+                                                    text = userData?.email ?: "email@example.com",
+                                                    fontSize = 16.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = Color.White
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 16.dp)
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = "DRIVER'S LICENSE",
+                                                fontSize = 16.sp,
+                                                color = Color.LightGray,
+                                                modifier = Modifier.padding(bottom = 4.dp)
+                                            )
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(
+                                                        Color(0xFF273548),
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .shadow(elevation = 4.dp, shape = RoundedCornerShape(8.dp))
+                                                    .padding(vertical = 12.dp, horizontal = 16.dp)
+                                            ) {
+                                                Text(
+                                                    text = userData?.driverLicense ?: "OR-02-68792",
+                                                    fontSize = 16.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = Color.White
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Edit button with elevation
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentAlignment = Alignment.CenterEnd
+                                    ) {
+                                        Button(
+                                            onClick = { isEditing = true },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = Color(0xFF4B5563),
+                                                contentColor = Color.White
+                                            ),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier
+                                                .width(90.dp)
+                                                .height(40.dp)
+                                                .shadow(
+                                                    elevation = 4.dp,
+                                                    shape = RoundedCornerShape(8.dp)
+                                                )
+                                        ) {
+                                            Text("EDIT")
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-
-                // Enhanced Sign Out Button
-                Button(
-                    onClick = onSignOut,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                        .height(56.dp)
-                        .shadow(
-                            elevation = 4.dp,
-                            spotColor = Color(0xFF00E5FF).copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(12.dp)
-                        ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Transparent
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                brush = Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color(0xFF00E5FF),
-                                        Color(0xFF00B3CC)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                                contentDescription = null,
-                                modifier = Modifier.padding(end = 8.dp),
-                                tint = Color.Black
-                            )
-                            Text(
-                                "Sign Out",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.Black
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
             }
-        }
-    }
-}
-
-@Composable
-private fun EditField(
-    label: String,
-    value: String,
-    onValueChange: (String) -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            fontSize = 14.sp,
-            color = Color(0xFFBBBBBB),
-            modifier = Modifier.padding(bottom = 4.dp, start = 4.dp)
-        )
-        TextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .border(
-                    width = 1.dp,
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color(0xFF00E5FF).copy(alpha = 0.7f),
-                            Color(0xFF00E5FF).copy(alpha = 0.3f)
-                        )
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ),
-            colors = TextFieldDefaults.colors(
-                unfocusedContainerColor = Color(0xFF2A2A2A),
-                focusedContainerColor = Color(0xFF2A2A2A),
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                cursorColor = Color(0xFF00E5FF),
-                unfocusedTextColor = Color.White,
-                focusedTextColor = Color.White
-            ),
-            shape = RoundedCornerShape(12.dp),
-            singleLine = true
-        )
-    }
-}
-
-@Composable
-private fun EnhancedInfoRow(
-    label: String,
-    value: String,
-    isLast: Boolean = false
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = if (isLast) 0.dp else 16.dp)
-    ) {
-        Text(
-            text = label,
-            fontSize = 14.sp,
-            color = Color(0xFFBBBBBB),
-            modifier = Modifier.padding(bottom = 2.dp)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    color = Color(0xFF252525),
-                    shape = RoundedCornerShape(8.dp)
-                )
-                .padding(vertical = 12.dp, horizontal = 16.dp)
-        ) {
-            Text(
-                text = value,
-                fontSize = 16.sp,
-                color = Color.White,
-                fontWeight = FontWeight.Medium
-            )
         }
     }
 }

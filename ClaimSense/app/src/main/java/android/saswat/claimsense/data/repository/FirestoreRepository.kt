@@ -37,12 +37,27 @@ class FirestoreRepository {
 
     // Vehicle operations
     suspend fun addVehicle(vehicle: Vehicle) = withContext(Dispatchers.IO) {
-         try {
+        try {
             Log.d("FirestoreRepository", "Adding vehicle to Firestore: $vehicle")
+            Log.d("FirestoreRepository", "isPaid status: ${vehicle.isPaid}")
+            
+            // Convert to map to ensure all fields are properly set
+            val vehicleMap = mapOf(
+                "id" to vehicle.id,
+                "userId" to vehicle.userId,
+                "make" to vehicle.make,
+                "model" to vehicle.model,
+                "year" to vehicle.year,
+                "licensePlate" to vehicle.licensePlate,
+                "isPaid" to vehicle.isPaid,
+                "createdAt" to vehicle.createdAt,
+                "updatedAt" to vehicle.updatedAt
+            )
+            
             vehiclesCollection.document(vehicle.id)
-                .set(vehicle)
+                .set(vehicleMap)
                 .await()
-            Log.d("FirestoreRepository", "Vehicle added successfully")
+            Log.d("FirestoreRepository", "Vehicle added successfully with isPaid=${vehicle.isPaid}")
         } catch (e: Exception) {
             Log.e("FirestoreRepository", "Error adding vehicle", e)
             throw e
@@ -57,6 +72,9 @@ class FirestoreRepository {
             .await()
         
         val vehicles = snapshot.toObjects(Vehicle::class.java)
+        vehicles.forEach { vehicle ->
+            Log.d("FirestoreRepository", "Retrieved vehicle: ${vehicle.make} ${vehicle.model}, isPaid=${vehicle.isPaid}")
+        }
         emit(vehicles)
     }
 
@@ -81,5 +99,20 @@ class FirestoreRepository {
         claimsCollection.document(claimId)
             .update("status", status)
             .await()
+    }
+    
+    // New direct method to update vehicle payment status
+    suspend fun updateVehiclePaymentStatus(vehicleId: String, isPaid: Boolean): Void? = withContext(Dispatchers.IO) {
+        try {
+            Log.d("FirestoreRepository", "Updating vehicle payment status: $vehicleId to $isPaid")
+            vehiclesCollection.document(vehicleId)
+                .update("isPaid", isPaid)
+                .await()
+            Log.d("FirestoreRepository", "Vehicle payment status updated successfully")
+            return@withContext null
+        } catch (e: Exception) {
+            Log.e("FirestoreRepository", "Error updating vehicle payment status", e)
+            throw e
+        }
     }
 }
